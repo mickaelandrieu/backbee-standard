@@ -368,7 +368,8 @@ switch ($step) {
             $em->flush();
             $step = 5;
 
-            $groups = \Symfony\Component\Yaml\Yaml::parse(__DIR__ . '/groups.yml');
+            $yamlParser = new \Symfony\Component\Yaml\Parser();
+            $groups = $yamlParser->parse(file_get_contents(\BackBee\Standard\Application::getConfigurationDir() . 'groups.yml'));
 
             foreach ($groups as $groupName => $rights) {
                 $group = new \BackBee\Security\Group();
@@ -404,7 +405,7 @@ function setSiteGroupRights($site, $group, $rights)
         }
 
         if (true === array_key_exists('pages', $rights)) {
-            addPageRights($rights['pages'], $aclProvider, $securityIdentity);
+            addPageRights($rights['pages'], $aclProvider, $securityIdentity, $em);
         }
 
         if (true === array_key_exists('mediafolders', $rights)) {
@@ -418,113 +419,113 @@ function setSiteGroupRights($site, $group, $rights)
         if (true === array_key_exists('bundles', $rights)) {
             addBundleRights($rights['bundles'], $aclProvider, $securityIdentity, $application);
         }
+
+        return $sites;
     }
 }
 
-function getActions($def)
+function getActions($definition)
 {
     $actions = array();
-    if (true === is_array($def)) {
-        $actions = array_intersect(array('view', 'create', 'edit', 'delete', 'publish'), $def);
-    } elseif ('all' === $def) {
+    if (is_array($definition)) {
+        $actions = array_intersect(array('view', 'create', 'edit', 'delete', 'publish'), $definition);
+    } elseif ('all' === $definition) {
         $actions = array('view', 'create', 'edit', 'delete', 'publish');
     }
 
     return $actions;
 }
 
-function addSiteRights($sitesDef, $aclProvider, $securityIdentity, $site)
+function addSiteRights($sitesDefinition, $aclProvider, $securityIdentity, $site)
 {
-    if (false === array_key_exists('resources', $sitesDef) || false === array_key_exists('actions', $sitesDef)) {
+    if (!array_key_exists('resources', $sitesDefinition) || !array_key_exists('actions', $sitesDefinition)) {
         return array();
     }
 
-    $actions = getActions($sitesDef['actions']);
+    $actions = getActions($sitesDefinition['actions']);
+
     if (0 === count($actions)) {
         return array();
     }
 
-    $sites = array();
-    if (true === is_array($sitesDef['resources']) && in_array($site->getLabel(), $sitesDef['resources'])) {
+    if (is_array($sitesDefinition['resources']) && in_array($site->getLabel(), $sitesDefinition['resources'])) {
         addObjectAcl($site, $aclProvider, $securityIdentity, $actions);
-    } elseif ('all' === $sitesDef['resources']) {
+    } elseif ('all' === $sitesDefinition['resources']) {
         addClassAcl(new \BackBee\Site\Site('*'), $aclProvider, $securityIdentity, $actions);
     }
 }
 
-function addLayoutRights($layoutDef, $aclProvider, $securityIdentity, $site, $em)
+function addLayoutRights($layoutDefinition, $aclProvider, $securityIdentity, $site, $em)
 {
-    if (false === array_key_exists('resources', $layoutDef) || false === array_key_exists('actions', $layoutDef)) {
+    if (!array_key_exists('resources', $layoutDefinition) || false === array_key_exists('actions', $layoutDefinition)) {
         return;
     }
 
-    $actions = getActions($layoutDef['actions']);
+    $actions = getActions($layoutDefinition['actions']);
     if (0 === count($actions)) {
         return array();
     }
 
-    if (true === is_array($layoutDef['resources'])) {
-        foreach ($layoutDef['resources'] as $layout_label) {
-            if (null === $layout = $em->getRepository('BackBee\Site\Layout')->findOneBy(array('_site' => $site, '_label' => $layout_label))) {
+    if (is_array($layoutDefinition['resources'])) {
+        foreach ($layoutDefinition['resources'] as $layoutLabel) {
+            if (null === $layout = $em->getRepository('BackBee\Site\Layout')->findOneBy(array('_site' => $site, '_label' => $layoutLabel))) {
                 continue;
             }
 
             addObjectAcl($layout, $aclProvider, $securityIdentity, $actions);
         }
-    } elseif ('all' === $layoutDef['resources']) {
+    } elseif ('all' === $layoutDefinition['resources']) {
         addClassAcl(new \BackBee\Site\Layout('*'), $aclProvider, $securityIdentity, $actions);
     }
 }
 
-function addPageRights($pageDef, $aclProvider, $securityIdentity)
+function addPageRights($pageDefinition, $aclProvider, $securityIdentity, $em)
 {
-    if (false === array_key_exists('resources', $pageDef) || false === array_key_exists('actions', $pageDef)) {
+    if (false === array_key_exists('resources', $pageDefinition) || false === array_key_exists('actions', $pageDefinition)) {
         return;
     }
 
-    $actions = getActions($pageDef['actions']);
+    $actions = getActions($pageDefinition['actions']);
     if (0 === count($actions)) {
         return array();
     }
 
-    if (true === is_array($pageDef['resources'])) {
-        foreach ($pageDef['resources'] as $page_url) {
-            $pages = $em->getRepository('BackBee\NestedNode\Page')->findBy(array('_url' => $page_url));
+    if (is_array($pageDefinition['resources'])) {
+        foreach ($pageDefinition['resources'] as $pageUrl) {
+            $pages = $em->getRepository('BackBee\NestedNode\Page')->findBy(array('_url' => $pageUrl));
             foreach ($pages as $page) {
                 addObjectAcl($page, $aclProvider, $securityIdentity, $actions);
             }
         }
-    } elseif ('all' === $pageDef['resources']) {
+    } elseif ('all' === $pageDefinition['resources']) {
         addClassAcl(new \BackBee\NestedNode\Page('*'), $aclProvider, $securityIdentity, $actions);
     }
 }
 
-function addFolderRights($folderDef, $aclProvider, $securityIdentity)
+function addFolderRights($folderDefinition, $aclProvider, $securityIdentity)
 {
-    if (false === array_key_exists('resources', $folderDef) || false === array_key_exists('actions', $folderDef)) {
+    if (!array_key_exists('resources', $folderDefinition) || !array_key_exists('actions', $folderDefinition)) {
         return;
     }
 
-    $actions = getActions($folderDef['actions']);
+    $actions = getActions($folderDefinition['actions']);
     if (0 === count($actions)) {
         return array();
     }
 
-    if ('all' === $folderDef['resources']) {
+    if ('all' === $folderDefinition['resources']) {
         addClassAcl(new \BackBee\NestedNode\MediaFolder('*'), $aclProvider, $securityIdentity, $actions);
     }
 }
 
-function addContentRights($contentDef, $aclProvider, $securityIdentity)
+function addContentRights($contentDefinition, $aclProvider, $securityIdentity)
 {
-    global $bbapp;
-
-    if (false === array_key_exists('resources', $contentDef) || false === array_key_exists('actions', $contentDef)) {
+    if (!array_key_exists('resources', $contentDefinition) || !array_key_exists('actions', $contentDefinition)) {
         return;
     }
 
-    if ('all' === $contentDef['resources']) {
-        $actions = getActions($contentDef['actions']);
+    if ('all' === $contentDefinition['resources']) {
+        $actions = getActions($contentDefinition['actions']);
         if (0 === count($actions)) {
             return array();
         }
@@ -551,69 +552,67 @@ function addContentRights($contentDef, $aclProvider, $securityIdentity)
                 $aclProvider->updateAcl($acl);
             }
         }
-    } elseif (true === is_array($contentDef['resources']) && 0 < count($contentDef['resources'])) {
-        if (true === is_array($contentDef['resources'][0])) {
-            $used_classes = array();
-            foreach($contentDef['resources'] as $index => $resources_def) {
-                if (false === isset($contentDef['actions'][$index])) {
+    } elseif (is_array($contentDefinition['resources']) && 0 < count($contentDefinition['resources'])) {
+        if (is_array($contentDefinition['resources'][0])) {
+            $usedClasses = array();
+            foreach($contentDefinition['resources'] as $index => $resourcesDefinition) {
+                if (false === isset($contentDefinition['actions'][$index])) {
                     continue;
                 }
 
-                $actions = getActions($contentDef['actions'][$index]);
+                $actions = getActions($contentDefinition['actions'][$index]);
 
-                if ('remains' === $resources_def) {
-                    foreach($all_classes as $content) {
-                        $classname = '\BackBee\ClassContent\\' . $content->name;
-                        if (false === in_array($classname, $used_classes)) {
-                            $used_classes[] = $classname;
+                if ('remains' === $resourcesDefinition) {
+                    foreach($allClasses as $content) {
+                        $className = '\BackBee\ClassContent\\' . $content->name;
+                        if (false === in_array($className, $usedClasses)) {
+                            $usedClasses[] = $className;
                             if (0 < count($actions)) {
-                                addClassAcl(new $classname('*'), $aclProvider, $securityIdentity, $actions);
+                                addClassAcl(new $className('*'), $aclProvider, $securityIdentity, $actions);
                             }
                         }
                     }
-                } elseif (true === is_array($resources_def)) {
-                    foreach ($resources_def as $content) {
-                        $classname = '\BackBee\ClassContent\\' . $content;
-                        if (substr($classname, -1) === '*') {
-                            $classname = substr($classname, 0 - 1);
-                            foreach ($all_classes as $content) {
-                                $fullclass = '\BackBee\ClassContent\\' . $content->name;
-                                if (0 === strpos($fullclass, $classname)) {
-                                    $used_classes[] = $fullclass;
+                } elseif (true === is_array($resourcesDefinition)) {
+                    foreach ($resourcesDefinition as $content) {
+                        $className = '\BackBee\ClassContent\\' . $content;
+                        if (substr($className, -1) === '*') {
+                            $className = substr($className, 0 - 1);
+                            foreach ($allClasses as $content) {
+                                $fullClass = '\BackBee\ClassContent\\' . $content->name;
+                                if (0 === strpos($fullClass, $className)) {
+                                    $usedClasses[] = $fullClass;
                                     if (0 < count($actions)) {
-                                        addClassAcl(new $fullclass('*'), $aclProvider, $securityIdentity, $actions);
+                                        addClassAcl(new $fullClass('*'), $aclProvider, $securityIdentity, $actions);
                                     }
                                 }
                             }
-                        } elseif (true === class_exists($classname)) {
-                            $used_classes[] = $classname;
+                        } elseif (true === class_exists($className)) {
+                            $usedClasses[] = $className;
                             if (0 < count($actions)) {
-                                addClassAcl(new $classname('*'), $aclProvider, $securityIdentity, $actions);
+                                addClassAcl(new $className('*'), $aclProvider, $securityIdentity, $actions);
                             }
-                        } else {
-
                         }
                     }
                 }
             }
         } else {
-            $actions = getActions($contentDef['actions']);
+            $actions = getActions($contentDefinition['actions']);
             if (0 === count($actions)) {
                 return array();
             }
 
-            foreach ($contentDef['resources'] as $content) {
-                $classname = '\BackBee\ClassContent\\' . $content;
-                if (substr($classname, -1) === '*') {
-                    $classname = substr($classname, 0 -1);
-                    foreach($all_classes as $content) {
-                        $fullclass = '\BackBee\ClassContent\\' . $content->name;
-                        if (0 === strpos($fullclass, $classname)) {
-                            addClassAcl(new $fullclass('*'), $aclProvider, $securityIdentity, $actions);
+            foreach ($contentDefinition['resources'] as $content) {
+                $className = '\BackBee\ClassContent\\' . $content;
+                if (substr($className, -1) === '*') {
+                    $className = substr($className, 0 -1);
+                    foreach($allClasses as $content) {
+                        $fullClass = '\BackBee\ClassContent\\' . $content->name;
+                        if (0 === strpos($fullClass, $className)) {
+                            addClassAcl(new $fullClass('*'), $aclProvider, $securityIdentity, $actions);
                         }
                     }
-                } elseif (true === class_exists($classname)) {
-                    addClassAcl(new $classname('*'), $aclProvider, $securityIdentity, $actions);
+                } elseif (true === class_exists($className)) {
+                    addClassAcl(new $className('*'), $aclProvider, $securityIdentity, $actions);
                 } else {
 
                 }
@@ -622,25 +621,25 @@ function addContentRights($contentDef, $aclProvider, $securityIdentity)
     }
 }
 
-function addBundleRights($bundleDef, $aclProvider, $securityIdentity, $application)
+function addBundleRights($bundleDefinition, $aclProvider, $securityIdentity, $application)
 {
 
-    if (false === array_key_exists('resources', $bundleDef) || false === array_key_exists('actions', $bundleDef)) {
+    if (!array_key_exists('resources', $bundleDefinition) || !array_key_exists('actions', $bundleDefinition)) {
         return;
     }
 
-    $actions = getActions($bundleDef['actions']);
+    $actions = getActions($bundleDefinition['actions']);
     if (0 === count($actions)) {
         return array();
     }
 
-    if (true === is_array($bundleDef['resources'])) {
-        foreach ($bundleDef['resources'] as $bundle_name) {
-            if (null !== $bundle = $application->getBundle($bundle_name)) {
+    if (is_array($bundleDefinition['resources'])) {
+        foreach ($bundleDefinition['resources'] as $bundleName) {
+            if (null !== $bundle = $application->getBundle($bundleName)) {
                 addObjectAcl($bundle, $aclProvider, $securityIdentity, $actions);
             }
         }
-    } elseif ('all' === $bundleDef['resources']) {
+    } elseif ('all' === $bundleDefinition['resources']) {
         foreach ($application->getBundles() as $bundle) {
             addObjectAcl($bundle, $aclProvider, $securityIdentity, $actions);
         }
