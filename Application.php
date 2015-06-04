@@ -22,6 +22,9 @@
 namespace BackBee\Standard;
 
 use BackBee\BBApplication;
+use BackBee\Console\Console;
+
+use Symfony\Component\Finder\Finder;
 
 /**
  * @author e.chau <eric.chau@lp-digital.fr>
@@ -35,6 +38,14 @@ class Application extends BBApplication
     public function getBaseDir()
     {
         return __DIR__;
+    }
+
+    /**
+     * Set the path to Commands in BackBee Standard application
+     */
+    public function getCommandsDir()
+    {
+        return __DIR__ . DIRECTORY_SEPARATOR . 'repository' . DIRECTORY_SEPARATOR . 'Command';
     }
 
     /**
@@ -55,6 +66,36 @@ class Application extends BBApplication
             && is_file($configDirectory.DIRECTORY_SEPARATOR.'doctrine.yml')
             && is_file($configDirectory.DIRECTORY_SEPARATOR.'bootstrap.yml')
         ;
+    }
+
+    /**
+     * Finds and registers Commands in BackBee Standard application
+     *
+     * @{inheritdoc}
+     * @param BackBee\Console\Console $console An Application instance
+     */
+    public function registerCommands(Console $console)
+    {
+        parent::registerCommands($console);
+
+        if (is_dir($directory = $this->getCommandsDir())) {
+            $files = (new Finder())->files()->name('*Command.php')->in($directory);
+            $commandNamespace = 'BackBee\Standard\Command';
+
+            foreach ($files as $file) {
+                if ($relativePath = $file->getRelativePath()) {
+                    $commandNamespace .= '\\'.strtr($relativePath, '/', '\\');
+                }
+                $reflectionClass = new \ReflectionClass($commandNamespace.'\\'.$file->getBasename('.php'));
+                if (
+                    $reflectionClass->isSubclassOf('BackBee\\Console\\AbstractCommand')
+                    && !$reflectionClass->isAbstract()
+                    && !$reflectionClass->getConstructor()->getNumberOfRequiredParameters()
+                ) {
+                    $console->add($reflectionClass->newInstance());
+                }
+            }
+        }
     }
 }
 
