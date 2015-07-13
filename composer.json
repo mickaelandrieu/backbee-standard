@@ -14,10 +14,13 @@
         "php": ">=5.4.0",
         "backbee/backbee": "1.0.*@dev",
         "backbee/script-handler": "1.0.*@dev",
+        "backbee/debug-bundle": "1.0.*@dev",
         "backbee/demo-bundle": "1.0.*@dev",
         "backbee/toolbar-bundle": "1.0.*@dev",
         "backbee/bb-core-js": "1.0.*@dev",
-        "twig/extensions": "1.1.0"
+        "twig/extensions": "1.1.0",
+        "symfony/stopwatch": "~2.7",
+        "symfony/var-dumper": "~2.7"
     },
     "autoload": {
         "psr-4": {

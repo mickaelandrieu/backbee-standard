@@ -1,3 +1,4 @@
 # bundles configuration
+debug: BackBee\Bundle\DebugBundle\Debug
 demo: BackBee\Bundle\DemoBundle\Demo
 toolbar: BackBee\Bundle\ToolbarBundle\Toolbar
